@@ -2,7 +2,7 @@
 
 ---
 
-## Functional Requirements
+## Functional Requirements.
 
 **FR-01** — The system shall allow authenticated users to create a direct (one-to-one)
 conversation with another user.
