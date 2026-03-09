@@ -94,7 +94,7 @@ conversation creator.
 
 ---
 
-## Data Flow
+## Data Flow.
 
 ### Message Send — Online Recipient
 
