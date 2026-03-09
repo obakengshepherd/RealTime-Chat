@@ -2,7 +2,7 @@
 
 ---
 
-## Section 1 — The Problem
+## Section 1 — The Problem.
 
 Real-time messaging is one of the most interaction-dense features in modern software. Users
 in a chat application expect messages to appear on the recipient's screen within milliseconds
