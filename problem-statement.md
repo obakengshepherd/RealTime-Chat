@@ -41,9 +41,10 @@ the moment a user goes offline and comes back.
 
 ---
 
-## Section 3 — Scope of This Implementation
+## Section 3 — Scope of This Implementation.
 
 **In scope:**
+
 - Direct (one-to-one) and group conversations
 - Real-time message delivery via WebSocket connections
 - Redis pub/sub as the cross-server message delivery bridge
@@ -54,6 +55,7 @@ the moment a user goes offline and comes back.
 - Reconnect recovery: clients re-fetch missed messages using last-seen message ID
 
 **Out of scope:**
+
 - End-to-end encryption
 - File, image, or media message attachments
 - Voice or video calling
