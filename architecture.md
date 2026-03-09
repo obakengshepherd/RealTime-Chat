@@ -130,15 +130,15 @@ stable under concurrent inserts. The `conversation_members` table tracks each us
 
 ---
 
-## Component Responsibilities Summary
+## Component Responsibilities Summary.
 
-| Component            | Responsibility                                          | Communicates Via          |
-|----------------------|---------------------------------------------------------|---------------------------|
-| Load Balancer        | TLS termination, WS affinity, REST round-robin          | WSS / HTTPS               |
-| WebSocket Gateway    | Connection lifecycle, Redis subscribe, push to client   | WebSocket + Redis pub/sub |
-| REST API             | Message history, conversations, async operations        | HTTP (internal)           |
-| MessageService       | Persist message, publish to Redis channel               | PostgreSQL + Redis        |
-| ConversationService  | Conversation and member management                      | PostgreSQL                |
-| PresenceService      | Online/offline state via Redis TTL + heartbeat          | Redis                     |
-| Redis                | Pub/sub delivery bus + presence TTL store               | In-memory                 |
-| PostgreSQL           | Durable message store, conversation state, receipts     | TCP                       |
+| Component           | Responsibility                                        | Communicates Via          |
+| ------------------- | ----------------------------------------------------- | ------------------------- |
+| Load Balancer       | TLS termination, WS affinity, REST round-robin        | WSS / HTTPS               |
+| WebSocket Gateway   | Connection lifecycle, Redis subscribe, push to client | WebSocket + Redis pub/sub |
+| REST API            | Message history, conversations, async operations      | HTTP (internal)           |
+| MessageService      | Persist message, publish to Redis channel             | PostgreSQL + Redis        |
+| ConversationService | Conversation and member management                    | PostgreSQL                |
+| PresenceService     | Online/offline state via Redis TTL + heartbeat        | Redis                     |
+| Redis               | Pub/sub delivery bus + presence TTL store             | In-memory                 |
+| PostgreSQL          | Durable message store, conversation state, receipts   | TCP                       |
