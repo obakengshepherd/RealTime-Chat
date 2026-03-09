@@ -43,48 +43,54 @@ conversation creator.
 ## Non-Functional Requirements
 
 ### Availability
+
 - **NFR-01** — The system shall maintain 99.9% uptime.
 - **NFR-02** — A single gateway instance failure must not result in message loss. Affected
   clients reconnect to a healthy instance within 5 seconds and recover missed messages.
 
 ### Latency
+
 - **NFR-03** — Real-time message delivery (WebSocket push) p95 ≤ 100ms end-to-end.
 - **NFR-04** — `GET /conversations/{id}/messages` p95 ≤ 150ms for pages of 50 messages.
 - **NFR-05** — Presence status update propagation p95 ≤ 5,000ms (eventual, not real-time).
 
 ### Throughput
+
 - **NFR-06** — The system shall support 100,000 concurrent WebSocket connections.
 - **NFR-07** — The system shall sustain 10,000 messages per second at peak.
 - **NFR-08** — The system shall handle conversations with up to 500 members.
 
 ### Durability
+
 - **NFR-09** — Every message that receives a sent acknowledgement to the sender must be
   permanently persisted and recoverable. Real-time delivery is best-effort; persistent
   delivery is guaranteed.
 
 ### Consistency
+
 - **NFR-10** — Message ordering within a conversation is consistent: all recipients observe
   the same sequence of messages.
 - **NFR-11** — Presence state is eventually consistent. A user may appear online for up to
   35 seconds after silent disconnection.
 
 ### Retention
+
 - **NFR-12** — Messages are retained for a minimum of 90 days and accessible via the
   history API throughout their retention period.
 
 ---
 
-## Estimated Traffic
+## Estimated Traffic.
 
-| Metric                            | Estimate                        |
-|-----------------------------------|---------------------------------|
-| Concurrent WebSocket connections  | 100,000                         |
-| Peak messages per second          | 10,000                          |
-| Average message size              | ~512 bytes                      |
-| Daily messages stored             | ~500,000,000 bytes (~500MB/day) |
-| Conversations active daily        | 500,000                         |
-| Message history requests/day      | 2,000,000                       |
-| Presence updates/second           | ~5,000 (heartbeats)             |
+| Metric                           | Estimate                        |
+| -------------------------------- | ------------------------------- |
+| Concurrent WebSocket connections | 100,000                         |
+| Peak messages per second         | 10,000                          |
+| Average message size             | ~512 bytes                      |
+| Daily messages stored            | ~500,000,000 bytes (~500MB/day) |
+| Conversations active daily       | 500,000                         |
+| Message history requests/day     | 2,000,000                       |
+| Presence updates/second          | ~5,000 (heartbeats)             |
 
 ---
 
