@@ -1,6 +1,26 @@
 using RealtimeChat.Infrastructure.Cache;
 using RealtimeChat.Infrastructure.Persistence;
 using StackExchange.Redis;
+using Shared.Infrastructure.RateLimit;
+using Shared.Api.Controllers;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+builder.Services.AddSingleton<IEnumerable<RateLimitRule>>(
+    _ => RateLimitPolicies.ChatPolicies());
+
+builder.Services.AddHealthChecks()
+    .AddCheck<RedisHealthCheck>("redis",       failureStatus: HealthStatus.Degraded,  tags: ["cache"])
+    .AddCheck<PostgreSqlHealthCheck>("postgresql", failureStatus: HealthStatus.Unhealthy, tags: ["database"]);
+
+builder.Services.AddTransient<RedisHealthCheck>();
+builder.Services.AddTransient(_ => new PostgreSqlHealthCheck(builder.Configuration.GetConnectionString("PostgreSQL")!));
+
+// ── Middleware pipeline ──
+// app.UseAuthentication();
+// app.UseAuthorization();
+// app.UseMiddleware<RedisRateLimitMiddleware>();
+// app.MapControllers();
+// app.MapHealthEndpoints();
 
 // Redis (singleton multiplexer — shared by pub/sub and presence)
 builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
