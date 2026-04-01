@@ -100,12 +100,6 @@ The chat system illustrates a fundamental distributed systems tradeoff: exactly-
 
 ---
 
-## Interview Talking Points
-
-- **The at-most-once tradeoff:** when an interviewer asks "what happens if a message is dropped?", explain that the system is designed for this. Dropped pub/sub messages are recovered via cursor pagination on reconnect. This is an explicit tradeoff — predictability in most cases over guaranteed delivery in all cases.
-- **Why Redis pub/sub and not WebSocket fan-out directly:** a single gateway instance could push directly to its connected clients, but this only works if sender and recipient are on the same instance. Redis pub/sub makes message delivery work correctly regardless of which instance each participant is connected to.
-- **The persist-then-publish ordering:** explain why reversing this order would be dangerous. If you publish first and the database write fails, clients receive a message that doesn't exist in the authoritative store — they cannot recover it later.
-
 ---
 
 ## Running the System
@@ -117,6 +111,7 @@ docker compose up --build
 ### Demo Operations
 
 **1. Create a direct conversation**
+
 ```bash
 curl -s -X POST http://localhost:8082/api/v1/conversations \
   -H "Content-Type: application/json" \
@@ -125,6 +120,7 @@ curl -s -X POST http://localhost:8082/api/v1/conversations \
 ```
 
 **2. Send a message**
+
 ```bash
 CONV_ID="conv_xxx"
 curl -s -X POST http://localhost:8082/api/v1/conversations/$CONV_ID/messages \
@@ -134,6 +130,7 @@ curl -s -X POST http://localhost:8082/api/v1/conversations/$CONV_ID/messages \
 ```
 
 **3. Retrieve message history with cursor**
+
 ```bash
 curl -s "http://localhost:8082/api/v1/conversations/$CONV_ID/messages?limit=20" | jq .
 # Note the cursor in the pagination object, then:
@@ -141,12 +138,14 @@ curl -s "http://localhost:8082/api/v1/conversations/$CONV_ID/messages?cursor=MSG
 ```
 
 **4. Mark message as read**
+
 ```bash
 MSG_ID="msg_xxx"
 curl -s -X PATCH http://localhost:8082/api/v1/messages/$MSG_ID/read | jq .
 ```
 
 **5. Check user conversations**
+
 ```bash
 curl -s http://localhost:8082/api/v1/users/usr_001/conversations | jq .
 ```
