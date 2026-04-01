@@ -1,7 +1,4 @@
-namespace RealtimeChat.Application.Interfaces;
-
-using RealtimeChat.Api.Models.Requests;
-using RealtimeChat.Api.Models.Responses;
+namespace RealtimeChat;
 
 /// <summary>
 /// Persists messages and publishes to Redis pub/sub for real-time delivery.

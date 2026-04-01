@@ -1,7 +1,7 @@
 using System.Net;
 using StackExchange.Redis;
 
-namespace Shared.Infrastructure.RateLimit;
+namespace RealtimeChat;
 
 // ════════════════════════════════════════════════════════════════════════════
 // DISTRIBUTED SLIDING WINDOW RATE LIMITER

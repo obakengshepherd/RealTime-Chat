@@ -1,12 +1,44 @@
 using System.Text.Json;
 using Dapper;
 using Npgsql;
-using RealtimeChat.Api.Models.Requests;
-using RealtimeChat.Api.Models.Responses;
-using RealtimeChat.Application.Interfaces;
 using StackExchange.Redis;
 
-namespace RealtimeChat.Infrastructure.Persistence;
+namespace RealtimeChat;
+
+// ════════════════════════════════════════════════════════════════════════════
+// SERVICE INTERFACES
+// ════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Persists messages and publishes to Redis pub/sub for real-time delivery.
+/// Publish always follows a successful database insert — never speculatively.
+/// </summary>
+public interface IMessageService
+{
+    Task<MessageResponse> SendMessageAsync(string conversationId, string senderId, string? idempotencyKey, SendMessageRequest request, CancellationToken ct);
+    Task<PagedApiResponse<MessageResponse>> GetMessagesAsync(string conversationId, string userId, GetMessagesRequest query, CancellationToken ct);
+    Task<ReadReceiptResponse> MarkReadAsync(string messageId, string userId, CancellationToken ct);
+    Task<MessageDeletedResponse> DeleteMessageAsync(string messageId, string userId, CancellationToken ct);
+}
+
+/// <summary>Manages conversation lifecycle and membership.</summary>
+public interface IConversationService
+{
+    Task<ConversationResponse> CreateConversationAsync(string creatorId, CreateConversationRequest request, CancellationToken ct);
+    Task<PagedApiResponse<ConversationResponse>> GetUserConversationsAsync(string targetUserId, string requestingUserId, PaginationRequest query, CancellationToken ct);
+}
+
+/// <summary>
+/// Manages online/offline presence via Redis TTL.
+/// Key: presence:{user_id} — TTL 35s, renewed on WebSocket heartbeat.
+/// </summary>
+public interface IPresenceService
+{
+    Task SetOnlineAsync(string userId, CancellationToken ct);
+    Task SetOfflineAsync(string userId, CancellationToken ct);
+    Task RenewPresenceAsync(string userId, CancellationToken ct);
+    Task<bool> IsOnlineAsync(string userId, CancellationToken ct);
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // CHAT REPOSITORY
@@ -201,78 +233,6 @@ public record ConversationListRecord
     public string? LastMsgSender { get; init; }
     public DateTimeOffset? LastMsgSentAt { get; init; }
 }
-
-namespace RealtimeChat.Infrastructure.Cache;
-
-// ════════════════════════════════════════════════════════════════════════════
-// CHAT CACHE SERVICE (Redis pub/sub + presence)
-// ════════════════════════════════════════════════════════════════════════════
-
-public class ChatCacheService
-{
-    private readonly IConnectionMultiplexer _redis;
-    private readonly IDatabase _db;
-    private readonly ILogger<ChatCacheService> _logger;
-    private static readonly TimeSpan PresenceTtl = TimeSpan.FromSeconds(35);
-
-    public ChatCacheService(IConnectionMultiplexer redis, ILogger<ChatCacheService> logger)
-    {
-        _redis  = redis;
-        _db     = redis.GetDatabase();
-        _logger = logger;
-    }
-
-    // ── Pub/Sub ───────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Publishes a message to the conversation channel.
-    /// All WebSocket Gateway instances subscribed to this channel receive it
-    /// and push to connected clients.
-    /// </summary>
-    public async Task PublishMessageAsync(string conversationId, object message)
-    {
-        try
-        {
-            var sub     = _redis.GetSubscriber();
-            var channel = RedisChannel.Literal($"conversation:{conversationId}");
-            await sub.PublishAsync(channel, JsonSerializer.Serialize(message));
-        }
-        catch (Exception ex)
-        {
-            // At-most-once delivery — failed publish is non-fatal.
-            // Clients recover missed messages on reconnect via message cursor.
-            _logger.LogWarning(ex, "Redis pub/sub publish failed for conversation {ConversationId} — non-fatal", conversationId);
-        }
-    }
-
-    // ── Presence ──────────────────────────────────────────────────────────────
-
-    public async Task SetOnlineAsync(string userId)
-    {
-        try { await _db.StringSetAsync($"presence:{userId}", "1", PresenceTtl); }
-        catch (Exception ex) { _logger.LogWarning(ex, "Redis presence set failed"); }
-    }
-
-    public async Task SetOfflineAsync(string userId)
-    {
-        try { await _db.KeyDeleteAsync($"presence:{userId}"); }
-        catch (Exception ex) { _logger.LogWarning(ex, "Redis presence delete failed"); }
-    }
-
-    public async Task RenewPresenceAsync(string userId)
-    {
-        try { await _db.KeyExpireAsync($"presence:{userId}", PresenceTtl); }
-        catch (Exception ex) { _logger.LogWarning(ex, "Redis presence renew failed"); }
-    }
-
-    public async Task<bool> IsOnlineAsync(string userId)
-    {
-        try { return await _db.KeyExistsAsync($"presence:{userId}"); }
-        catch { return false; }
-    }
-}
-
-namespace RealtimeChat.Application.Services;
 
 // ════════════════════════════════════════════════════════════════════════════
 // MESSAGE SERVICE
@@ -511,14 +471,3 @@ public class PresenceService : IPresenceService
     public async Task<bool> IsOnlineAsync(string userId, CancellationToken ct)
         => await _cache.IsOnlineAsync(userId);
 }
-
-// ── Chat exceptions ───────────────────────────────────────────────────────────
-
-public class NotConversationMemberException(string userId, string convId)
-    : Exception($"User '{userId}' is not a member of conversation '{convId}'.");
-
-public class MessageNotFoundException(string messageId)
-    : Exception($"Message '{messageId}' not found.");
-
-public class MessageDeleteException(string messageId)
-    : Exception($"Message '{messageId}' could not be deleted. It may already be deleted or not owned by you.");

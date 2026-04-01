@@ -2,15 +2,15 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using System.Text.Json;
+using StackExchange.Redis;
 
-namespace Shared.Api.Controllers;
+namespace RealtimeChat;
 
 // ════════════════════════════════════════════════════════════════════════════
 // HEALTH CONTROLLER
 // ════════════════════════════════════════════════════════════════════════════
 //
-// Provides two health endpoints:
-//
+// Provides health check endpoints:
 //   GET /health         — lightweight liveness probe (load balancer use)
 //   GET /health/detail  — full readiness probe (deployment monitoring)
 //
@@ -59,7 +59,7 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// Full readiness probe. Checks all dependencies (PostgreSQL, Redis, Kafka/RabbitMQ).
+    /// Full readiness probe. Checks all dependencies (PostgreSQL, Redis).
     /// Returns 200 if all checks pass, 503 if any check fails or is degraded.
     /// Used by deployment pipelines and monitoring systems.
     /// </summary>
@@ -85,22 +85,28 @@ public class HealthController : ControllerBase
             })
         };
 
-        return report.Status == HealthStatus.Healthy
+        return report.Status == HealthStatus.Healthy || report.Status == HealthStatus.Degraded
             ? Ok(response)
             : StatusCode(StatusCodes.Status503ServiceUnavailable, response);
     }
+
+    /// <summary>
+    /// Short-hand alias for GET /health/detail
+    /// </summary>
+    [HttpGet("ready")]
+    public async Task<IActionResult> Ready(CancellationToken ct) => await Readiness(ct);
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// HEALTH CHECK REGISTRATION — shared extension method for all systems
+// HEALTH CHECK REGISTRATION — shared extension method
 // ════════════════════════════════════════════════════════════════════════════
 
 public static class HealthCheckExtensions
 {
     /// <summary>
     /// Registers health check endpoints with the standard configuration:
-    ///   GET /health        → liveness (always 200 if process alive)
-    ///   GET /health/detail → readiness (checks all dependencies)
+    ///   GET /health        — liveness (always 200 if process alive)
+    ///   GET /health/detail — readiness (checks all dependencies)
     /// </summary>
     public static WebApplication MapHealthEndpoints(this WebApplication app)
     {
@@ -160,9 +166,6 @@ public static class HealthCheckExtensions
 // CUSTOM HEALTH CHECKS — per-system dependency checks
 // ════════════════════════════════════════════════════════════════════════════
 
-using Microsoft.Extensions.Diagnostics.HealthChecks;
-using StackExchange.Redis;
-
 /// <summary>
 /// Redis health check — verifies connection and basic PING command.
 /// Marked as degraded (not unhealthy) because Redis failure degrades
@@ -181,7 +184,6 @@ public class RedisHealthCheck : IHealthCheck
         {
             var db = _redis.GetDatabase();
             await db.PingAsync();
-            var info = await _redis.GetServer(_redis.GetEndPoints().First()).InfoAsync();
             return HealthCheckResult.Healthy("Redis is reachable and responding to PING.");
         }
         catch (Exception ex)
@@ -218,69 +220,6 @@ public class PostgreSqlHealthCheck : IHealthCheck
         {
             return HealthCheckResult.Unhealthy(
                 $"PostgreSQL is unreachable: {ex.Message}");
-        }
-    }
-}
-
-/// <summary>
-/// Kafka health check — verifies broker connectivity by listing topics.
-/// </summary>
-public class KafkaHealthCheck : IHealthCheck
-{
-    private readonly string _bootstrapServers;
-
-    public KafkaHealthCheck(string bootstrapServers) => _bootstrapServers = bootstrapServers;
-
-    public Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context, CancellationToken ct = default)
-    {
-        try
-        {
-            using var adminClient = new Confluent.Kafka.AdminClientBuilder(
-                new Confluent.Kafka.AdminClientConfig
-                {
-                    BootstrapServers = _bootstrapServers,
-                    SocketTimeoutMs  = 3000
-                }).Build();
-
-            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(3));
-            return Task.FromResult(HealthCheckResult.Healthy(
-                $"Kafka reachable — {metadata.Brokers.Count} broker(s), {metadata.Topics.Count} topic(s)."));
-        }
-        catch (Exception ex)
-        {
-            return Task.FromResult(HealthCheckResult.Degraded(
-                $"Kafka unreachable: {ex.Message}. Event publishing may fail."));
-        }
-    }
-}
-
-/// <summary>
-/// RabbitMQ health check — verifies connection by opening a channel.
-/// </summary>
-public class RabbitMqHealthCheck : IHealthCheck
-{
-    private readonly string _connectionString;
-
-    public RabbitMqHealthCheck(string connectionString) => _connectionString = connectionString;
-
-    public Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context, CancellationToken ct = default)
-    {
-        try
-        {
-            var factory = new RabbitMQ.Client.ConnectionFactory
-            {
-                Uri = new Uri(_connectionString)
-            };
-            using var connection = factory.CreateConnection();
-            using var channel    = connection.CreateModel();
-            return Task.FromResult(HealthCheckResult.Healthy("RabbitMQ is reachable."));
-        }
-        catch (Exception ex)
-        {
-            return Task.FromResult(HealthCheckResult.Degraded(
-                $"RabbitMQ unreachable: {ex.Message}. Async event publishing may fail."));
         }
     }
 }

@@ -1,4 +1,4 @@
-namespace RealtimeChat.Domain.Entities;
+namespace RealtimeChat;
 
 public class Conversation
 {

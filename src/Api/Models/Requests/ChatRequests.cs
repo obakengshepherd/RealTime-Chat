@@ -1,4 +1,4 @@
-namespace RealtimeChat.Api.Models.Requests;
+namespace RealtimeChat;
 
 using System.ComponentModel.DataAnnotations;
 

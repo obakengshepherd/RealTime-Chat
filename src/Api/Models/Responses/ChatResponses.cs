@@ -1,4 +1,10 @@
-namespace RealtimeChat.Api.Models.Responses;
+namespace RealtimeChat;
+
+public class PaginationMeta {
+    public string? Cursor { get; set; }
+    public bool HasMore { get; set; }
+    public int Limit { get; set; }
+}
 
 public record ConversationResponse
 {
@@ -45,5 +51,4 @@ public record MessageDeletedResponse
 public record ApiResponse<T> { public T Data { get; init; } = default!; public ApiMeta Meta { get; init; } = new(); }
 public record PagedApiResponse<T> { public IEnumerable<T> Data { get; init; } = []; public PaginationMeta Pagination { get; init; } = new(); public ApiMeta Meta { get; init; } = new(); }
 public record ApiMeta { public string RequestId { get; init; } = Guid.NewGuid().ToString(); public DateTimeOffset Timestamp { get; init; } = DateTimeOffset.UtcNow; }
-public record PaginationMeta { public string? Cursor { get; init; } public bool HasMore { get; init; } public int Limit { get; init; } }
 public static class ApiResponse { public static ApiResponse<T> Success<T>(T data) => new() { Data = data }; }

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using StackExchange.Redis;
 
-namespace RealtimeChat.Infrastructure.Cache;
+namespace RealtimeChat;
 
 /// <summary>
 /// Extended Chat cache service with full subscription lifecycle management.

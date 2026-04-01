@@ -1,0 +1,104 @@
+version: "3.9"
+
+# Real-Time Chat System — Local Development Stack
+# Start: docker compose up --build
+# Note: Chat uses Redis pub/sub for real-time delivery — no Kafka needed.
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     ${POSTGRES_USER:-devuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpass}
+      POSTGRES_DB:       ${POSTGRES_DB:-realtime_chat}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-devuser} -d ${POSTGRES_DB:-realtime_chat}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    restart: unless-stopped
+    # Enable keyspace notifications for presence key expiry detection
+    command: redis-server --appendonly yes --notify-keyspace-events Ex
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6381:6379"
+    networks:
+      - infra
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  migrate:
+    image: flyway/flyway:10-alpine
+    container_name: chat-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      -url=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-realtime_chat}
+      -user=${POSTGRES_USER:-devuser}
+      -password=${POSTGRES_PASSWORD:-devpass}
+      -locations=filesystem:/flyway/sql
+      -baselineOnMigrate=true
+      migrate
+    volumes:
+      - ./migrations:/flyway/sql:ro
+    networks:
+      - infra
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__PostgreSQL: ${DB_CONNECTION_STRING:-Host=postgres;Port=5432;Database=realtime_chat;Username=devuser;Password=devpass;}
+      ConnectionStrings__Redis: ${REDIS_URL:-redis:6379}
+      PORT: ${PORT:-8080}
+    ports:
+      - "${PORT:-8082}:8080"
+    networks:
+      - app
+      - infra
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  app:
+    driver: bridge
+  infra:
+    driver: bridge
